@@ -14,9 +14,13 @@ set(CMAKE_CXX_FLAGS "-g -Wall -Wextra -Werror")
 project(raytracing_weekend)
 
 # basic ppm executable
-add_executable(ppm_test
-               ${CMAKE_CURRENT_SOURCE_DIR}/src/ppm_test.cpp)
+add_executable(inOneWeekend
+               ${CMAKE_CURRENT_SOURCE_DIR}/src/main.cpp)
 
 # Don't want gnu C++ extentions
-set_target_properties(ppm_test
+set_target_properties(inOneWeekend
                       PROPERTIES CXX_EXTENSIONS OFF)
+
+# Add includes
+target_include_directories(inOneWeekend
+                           PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
