@@ -41,8 +41,4 @@ inline double clamp(double x, double min, double max) {
     return x;
 }
 
-// common headers
-#include "../include/ray.hpp"
-#include "../include/vec3.hpp"
-
 #endif /* RTWEEKEND_H */

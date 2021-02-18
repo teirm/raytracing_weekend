@@ -9,7 +9,7 @@ set(CMAKE_CXX_COMPILER /usr/bin/clang++)
 # set C++ standard to C++17
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
-set(CMAKE_CXX_FLAGS "-g -Wall -Wextra -Werror")
+set(CMAKE_CXX_FLAGS "-g -O3 -Wall -Wextra -Werror")
 
 project(raytracing_weekend)
 
