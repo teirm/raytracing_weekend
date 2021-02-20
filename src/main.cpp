@@ -10,6 +10,7 @@
 #include "../include/material.hpp"
 
 #include <iostream>
+#include <chrono>
 
 color ray_color(const ray& r, const hittable& world, int depth) {
     
@@ -84,6 +85,8 @@ hittable_list random_scene() {
 
 int main()
 {
+    using namespace std::literals;
+
     // image 
     const auto aspect_ratio = 3.0 / 2.0;
     const int image_width   = 1200;
@@ -105,6 +108,8 @@ int main()
     // render
     std::cout << "P3\n" << image_width << ' ' << image_height << "\n255\n";
 
+
+    const auto start = std::chrono::steady_clock::now();
     for (int j = image_height-1; j >= 0; --j) {
         std::cerr << "\rScanlines remaining: " << j << ' ' << std::flush;
         for (int i = 0; i < image_width; ++i) {
@@ -118,5 +123,7 @@ int main()
             write_color(std::cout, pixel_color, samples_per_pixel);
         }
     }
-    std::cerr << "\nDone.\n";
+    const auto end = std::chrono::steady_clock::now();
+    std::cerr << "\nDone. Elapsed Time: "
+              << (end - start) / 1s << "s.\n";
 }
