@@ -11,6 +11,10 @@
 
 #include <iostream>
 #include <chrono>
+#include <thread>
+#include <vector>
+
+using color_vector = std::vector<color>;
 
 color ray_color(const ray& r, const hittable& world, int depth) {
     
@@ -83,34 +87,17 @@ hittable_list random_scene() {
     return world;
 }
 
-int main()
+void generate_image(const int image_height,
+                    const int image_width, 
+                    const int start_height,
+                    const int end_height,
+                    const int samples_per_pixel, 
+                    const camera &cam,
+                    const hittable_list& world)
 {
-    using namespace std::literals;
-
-    // image 
-    const auto aspect_ratio = 3.0 / 2.0;
-    const int image_width   = 1200;
-    const int image_height  = static_cast<int>(image_width / aspect_ratio);
-    const int samples_per_pixel = 500;
     const int max_depth = 50;
-
-    // world
-    auto world = random_scene();
-
-    // Camera
-    point3 lookfrom(13, 2, 3);
-    point3 lookat(0, 0, 0);
-    vec3   vup(0, 1, 0);
-    auto   dist_to_focus = 10.0; 
-    auto   aperture = 0.1;
-    camera cam(lookfrom, lookat, vup, 20, aspect_ratio, aperture, dist_to_focus);
-
-    // render
-    std::cout << "P3\n" << image_width << ' ' << image_height << "\n255\n";
-
-
-    const auto start = std::chrono::steady_clock::now();
-    for (int j = image_height-1; j >= 0; --j) {
+    
+    for (int j = start_height-1; j >= end_height; --j) {
         std::cerr << "\rScanlines remaining: " << j << ' ' << std::flush;
         for (int i = 0; i < image_width; ++i) {
             color pixel_color(0, 0, 0);
@@ -123,6 +110,58 @@ int main()
             write_color(std::cout, pixel_color, samples_per_pixel);
         }
     }
+}
+
+int main()
+{
+    using namespace std::literals;
+
+    // image 
+    const auto aspect_ratio = 3.0 / 2.0;
+    const int image_width   = 1200;
+    const int image_height  = static_cast<int>(image_width / aspect_ratio);
+    const int samples_per_pixel = 2;
+    
+    // Camera
+    point3 lookfrom(13, 2, 3);
+    point3 lookat(0, 0, 0);
+    vec3   vup(0, 1, 0);
+    auto   dist_to_focus = 10.0; 
+    auto   aperture = 0.1;
+    camera cam(lookfrom, lookat, vup, 20, aspect_ratio, aperture, dist_to_focus);
+
+    // start timer 
+    const auto start = std::chrono::steady_clock::now();
+
+    // world
+    auto world = random_scene();
+
+    
+    auto concurrency = std::thread::hardware_concurrency();
+    if (concurrency == 0) {
+        /* unable to fetch on platform */
+        concurrency = 2;
+        std::cerr << "Unable to fetch hardware concurrency. Concurrency set to " << concurrency << "\n";
+    }
+
+    auto height_partition_size = image_height / concurrency;  
+
+    // render
+    int start_height = image_height;
+    int end_height = image_height - height_partition_size;
+    std::cout << "P3\n" << image_width << ' ' << image_height << "\n255\n";
+    for (unsigned i = 0; i < concurrency - 1; ++i) {
+        std::cerr << "Rendering on [" << end_height << "," << start_height << ")\n";
+        generate_image(image_height, image_width, start_height, end_height, samples_per_pixel, cam, world);
+        start_height = end_height;
+        end_height = end_height - height_partition_size;
+    }
+    
+    // do final range if uneven division of height
+    std::cerr << "Rendering on [" << 0 << "," << start_height << ")\n";
+    generate_image(image_height, image_width, start_height, 0, samples_per_pixel, cam, world);
+
+    // end timer
     const auto end = std::chrono::steady_clock::now();
     std::cerr << "\nDone. Elapsed Time: "
               << (end - start) / 1s << "s.\n";
