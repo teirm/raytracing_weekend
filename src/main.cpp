@@ -87,18 +87,25 @@ hittable_list random_scene() {
     return world;
 }
 
+std::vector<color_vector> all_colors;
+
 void generate_image(const int image_height,
                     const int image_width, 
                     const int start_height,
                     const int end_height,
                     const int samples_per_pixel, 
                     const camera &cam,
-                    const hittable_list& world)
+                    const hittable_list& world,
+                    const int thread_id)
 {
+    color_vector colors;
     const int max_depth = 50;
     
+    // reserve space for color vector to avoid constant resizing
+    colors.reserve(start_height - end_height);
+
     for (int j = start_height-1; j >= end_height; --j) {
-        std::cerr << "\rScanlines remaining: " << j << ' ' << std::flush;
+        //std::cerr << "\rScanlines remaining: " << j << ' ' << std::flush;
         for (int i = 0; i < image_width; ++i) {
             color pixel_color(0, 0, 0);
             for (int s = 0; s < samples_per_pixel; ++s) {
@@ -107,9 +114,10 @@ void generate_image(const int image_height,
                 ray r = cam.get_ray(u, v);
                 pixel_color += ray_color(r, world, max_depth);
             }
-            write_color(std::cout, pixel_color, samples_per_pixel);
+            colors.push_back(pixel_color);
         }
     }
+    all_colors[thread_id] = colors;
 }
 
 int main()
@@ -120,7 +128,7 @@ int main()
     const auto aspect_ratio = 3.0 / 2.0;
     const int image_width   = 1200;
     const int image_height  = static_cast<int>(image_width / aspect_ratio);
-    const int samples_per_pixel = 2;
+    const int samples_per_pixel = 500;
     
     // Camera
     point3 lookfrom(13, 2, 3);
@@ -135,16 +143,20 @@ int main()
 
     // world
     auto world = random_scene();
-
     
+    // use underlying hardware to maximum concurrency
     auto concurrency = std::thread::hardware_concurrency();
     if (concurrency == 0) {
-        /* unable to fetch on platform */
+        // use two threads if unable to fetch 
         concurrency = 2;
         std::cerr << "Unable to fetch hardware concurrency. Concurrency set to " << concurrency << "\n";
     }
 
-    auto height_partition_size = image_height / concurrency;  
+    const int height_partition_size = image_height / concurrency;  
+    all_colors = std::vector<color_vector>(concurrency);
+    
+    // container for rendering threads
+    std::vector<std::thread> threads;
 
     // render
     int start_height = image_height;
@@ -152,14 +164,26 @@ int main()
     std::cout << "P3\n" << image_width << ' ' << image_height << "\n255\n";
     for (unsigned i = 0; i < concurrency - 1; ++i) {
         std::cerr << "Rendering on [" << end_height << "," << start_height << ")\n";
-        generate_image(image_height, image_width, start_height, end_height, samples_per_pixel, cam, world);
+        threads.push_back(std::thread(generate_image, image_height, image_width, start_height, end_height, samples_per_pixel, cam, world, i));
         start_height = end_height;
         end_height = end_height - height_partition_size;
     }
     
     // do final range if uneven division of height
     std::cerr << "Rendering on [" << 0 << "," << start_height << ")\n";
-    generate_image(image_height, image_width, start_height, 0, samples_per_pixel, cam, world);
+    threads.push_back(std::thread(generate_image, image_height, image_width, start_height, end_height, samples_per_pixel, cam, world, concurrency-1));
+    
+    // join on all rendering threads
+    for (auto& thread : threads) {
+        thread.join();
+    }
+
+    // write out all pixels
+    for (auto &colors : all_colors) {
+        for (auto &color : colors) {
+            write_color(std::cout, color, samples_per_pixel);
+        }
+    }
 
     // end timer
     const auto end = std::chrono::steady_clock::now();

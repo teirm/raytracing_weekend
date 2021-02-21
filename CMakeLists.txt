@@ -24,3 +24,7 @@ set_target_properties(inOneWeekend
 # Add includes
 target_include_directories(inOneWeekend
                            PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
+
+# std::thread depends on pthread on linux and freebsd
+# Don't care about windows anytime soon
+target_link_libraries(inOneWeekend PRIVATE pthread)
